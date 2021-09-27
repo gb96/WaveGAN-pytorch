@@ -9,6 +9,7 @@ import argparse
 import pescador
 import numpy as np
 from config import *
+import soundfile as sf
 from torch import autograd
 from torch.autograd import Variable
 import matplotlib
@@ -47,7 +48,8 @@ def save_samples(epoch_samples, epoch, output_dir, fs=16000):
     for idx, sample in enumerate(epoch_samples):
         output_path = os.path.join(sample_dir, "{}.wav".format(idx+1))
         sample = sample[0]
-        librosa.output.write_wav(output_path, sample, fs)
+        sf.write(output_path, sample, fs, format='WAV', subtype='PCM_24')
+        # librosa.output.write_wav(output_path, sample, fs)
 
 
 # Adapted from @jtcramer https://github.com/jtcramer/wavegan/blob/master/sample.py.

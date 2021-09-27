@@ -1,17 +1,14 @@
-import torch
-from torch import autograd
-from torch import optim
-import json
-from utils import save_samples
-import numpy as np
-import pprint
-import pickle
 import datetime
-from wavegan import *
-from utils import *
-from logger import *
-cuda = True if torch.cuda.is_available() else False
+import json
+import pickle
 
+from torch import optim
+
+from logger import *
+from utils import *
+from wavegan import *
+
+cuda = True if torch.cuda.is_available() else False
 
 # =============Logger===============
 LOGGER = logging.getLogger('wavegan')
@@ -64,17 +61,16 @@ with open(config_path, 'w') as f:
     json.dump(args, f)
 
 # Load data.
-LOGGER.info('Loading audio data...')
+LOGGER.info('Loading audio data... cuda={}'.format(cuda))
 audio_paths = get_all_audio_filepaths(audio_dir)
 train_data, valid_data, test_data, train_size = split_data(audio_paths, args['valid_ratio'],
                                                            args['test_ratio'], batch_size)
 TOTAL_TRAIN_SAMPLES = train_size
-BATCH_NUM = TOTAL_TRAIN_SAMPLES // batch_size
+BATCH_NUM = max(1, TOTAL_TRAIN_SAMPLES // batch_size)
 
 train_iter = iter(train_data)
 valid_iter = iter(valid_data)
 test_iter = iter(test_data)
-
 
 # =============Train===============
 history = []
@@ -86,7 +82,14 @@ G_costs = []
 
 start = time.time()
 LOGGER.info('Starting training...EPOCHS={}, BATCH_SIZE={}, BATCH_NUM={}'.format(epochs, batch_size, BATCH_NUM))
-for epoch in range(1, epochs+1):
+
+one = torch.tensor(1, dtype=torch.float)
+neg_one = one * -1
+if cuda:
+    one = one.cuda()
+    neg_one = neg_one.cuda()
+
+for epoch in range(1, epochs + 1):
     LOGGER.info("{} Epoch: {}/{}".format(time_since(start), epoch, epochs))
 
     D_cost_train_epoch = []
@@ -94,16 +97,12 @@ for epoch in range(1, epochs+1):
     D_cost_valid_epoch = []
     D_wass_valid_epoch = []
     G_cost_epoch = []
-    for i in range(1, BATCH_NUM+1):
+
+    for i in range(1, BATCH_NUM + 1):
         # Set Discriminator parameters to require gradients.
         for p in netD.parameters():
             p.requires_grad = True
-  
-        one = torch.tensor(1, dtype=torch.float)
-        neg_one = one * -1
-        if cuda:
-            one = one.cuda()
-            neg_one = neg_one.cuda()
+
         #############################
         # (1) Train Discriminator
         #############################
@@ -207,19 +206,24 @@ for epoch in range(1, epochs+1):
             G_cost = G_cost.cpu()
         G_cost_epoch.append(G_cost.data.numpy())
 
-        if i % (BATCH_NUM // 5) == 0:
-            LOGGER.info("{} Epoch={} Batch: {}/{} D_c:{:.4f} | D_w:{:.4f} | G:{:.4f}".format(time_since(start), epoch,
-                                                                                             i, BATCH_NUM,
-                                                                                             D_cost_train.data.numpy(),
-                                                                                             D_wass_train.data.numpy(),
-                                                                                             G_cost.data.numpy()))
+        LOGGER.info("{} Epoch={} Batch: {}/{} D_c:{:.4f} | D_w:{:.4f} | G:{:.4f}".format(time_since(start), epoch,
+                                                                                         i, BATCH_NUM,
+                                                                                         D_cost_train.data.numpy(),
+                                                                                         D_wass_train.data.numpy(),
+                                                                                         G_cost.data.numpy()))
 
     # Save the average cost of batches in every epoch.
-    D_cost_train_epoch_avg = sum(D_cost_train_epoch) / float(len(D_cost_train_epoch))
-    D_wass_train_epoch_avg = sum(D_wass_train_epoch) / float(len(D_wass_train_epoch))
-    D_cost_valid_epoch_avg = sum(D_cost_valid_epoch) / float(len(D_cost_valid_epoch))
-    D_wass_valid_epoch_avg = sum(D_wass_valid_epoch) / float(len(D_wass_valid_epoch))
-    G_cost_epoch_avg = sum(G_cost_epoch) / float(len(G_cost_epoch))
+    D_cost_train_len = len(D_cost_train_epoch)
+    D_wass_train_len = len(D_wass_train_epoch)
+    D_cost_valid_len = len(D_cost_valid_epoch)
+    D_wass_valid_len = len(D_wass_valid_epoch)
+    G_cost_len = len(G_cost_epoch)
+
+    D_cost_train_epoch_avg = sum(D_cost_train_epoch) / float(D_cost_train_len)
+    D_wass_train_epoch_avg = sum(D_wass_train_epoch) / float(D_wass_train_len)
+    D_cost_valid_epoch_avg = sum(D_cost_valid_epoch) / float(D_cost_valid_len)
+    D_wass_valid_epoch_avg = sum(D_wass_valid_epoch) / float(D_wass_valid_len)
+    G_cost_epoch_avg = sum(G_cost_epoch) / float(G_cost_len)
 
     D_costs_train.append(D_cost_train_epoch_avg)
     D_wasses_train.append(D_wass_train_epoch_avg)
@@ -262,8 +266,3 @@ plot_loss(D_costs_train, D_wasses_train,
           D_costs_valid, D_wasses_valid, G_costs, output_dir)
 
 LOGGER.info("All finished!")
-
-
-
-
-

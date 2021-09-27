@@ -5,7 +5,7 @@ import torch.utils.data
 
 
 class Transpose1dLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=11, upsample=None, output_padding=1):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding=(11), upsample=None, output_padding=(1)):
         super(Transpose1dLayer, self).__init__()
         self.upsample = upsample
 
@@ -51,7 +51,7 @@ class WaveGANGenerator(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.ConvTranspose1d) or isinstance(m, nn.Linear):
-                nn.init.kaiming_normal(m.weight.data)
+                nn.init.kaiming_normal_(m.weight.data)
 
     def forward(self, x):
         x = self.fc1(x).view(-1, 16 * self.model_size, 16)
@@ -75,7 +75,7 @@ class WaveGANGenerator(nn.Module):
         if self.verbose:
             print(x.shape)
 
-        output = F.tanh(self.deconv_5(x))
+        output = torch.tanh(self.deconv_5(x))
         return output
 
 
@@ -155,7 +155,7 @@ class WaveGANDiscriminator(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv1d) or isinstance(m, nn.Linear):
-                nn.init.kaiming_normal(m.weight.data)
+                nn.init.kaiming_normal_(m.weight.data)
 
     def forward(self, x):
         x = F.leaky_relu(self.conv1(x), negative_slope=self.alpha)
